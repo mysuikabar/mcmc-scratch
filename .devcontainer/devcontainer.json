@@ -1,0 +1,20 @@
+{
+    "name": "python-dev",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "python-dev",
+    "workspaceFolder": "/workspace",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-toolsai.jupyter",
+                "ms-python.mypy-type-checker",
+                "charliermarsh.ruff",
+                "mhutchie.git-graph",
+                "gruntfuggly.todo-tree",
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    },
+    "postCreateCommand": ".devcontainer/post-create.sh"
+}
