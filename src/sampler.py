@@ -1,8 +1,8 @@
-import math
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
+import mpmath
 import numpy as np
 from tqdm import tqdm
 
@@ -64,15 +64,12 @@ class GibbsSampler:
         x = np.zeros(self.sample_size)
 
         for i in range(self.sample_size):
-            x_min, x_max = max(0, z[i] - self.ny[i]), min(self.nx[i], z[i])
-            values = list(range(x_min, x_max + 1))
-            weights = [
-                self._conditional_dist_of_x(
-                    x=x, z=z[i], nx=self.nx[i], ny=self.ny[i], px=px, py=py
-                )
-                for x in values
-            ]
-            x[i] = np.random.choice(values, p=weights)
+            conditional_probs = self._conditional_probs_of_x(
+                z=z[i], nx=self.nx[i], ny=self.ny[i], px=px, py=py
+            )
+            values = list(conditional_probs.keys())
+            probs = list(conditional_probs.values())
+            x[i] = np.random.choice(values, p=probs)
 
         return x
 
@@ -121,23 +118,34 @@ class GibbsSampler:
         axes[1].hist(py_chain, density=True)
 
     @staticmethod
-    def _conditional_dist_of_x(
-        x: int, z: int, nx: int, ny: int, px: float, py: float
-    ) -> float:
+    def _conditional_probs_of_x(
+        z: int, nx: int, ny: int, px: float, py: float, dps: int = 10
+    ) -> Dict[int, float]:
         """
         xの完全条件付き分布
-        Note: 正規化定数は無視
+        xの値から対応する確率値へのマッピングを返す
+
+        Note: 桁落ちを考慮してmpmathによる任意精度の浮動小数点で計算
         """
-        y = z - x
+        mpmath.mp.dps = dps  # 小数の桁数
 
-        if not (0 <= x <= nx and 0 <= y <= ny):
-            return 0
+        probs = {}
+        total_prob = mpmath.mpf("0")
 
-        return (
-            math.comb(nx, x)
-            * (px**x)
-            * ((1 - px) ** (nx - x))
-            * math.comb(ny, y)
-            * (py**y)
-            * ((1 - py) ** (ny - y))
-        )
+        x_min, x_max = max(0, z - ny), min(nx, z)
+        for x in range(x_min, x_max + 1):
+            y = z - x
+            prob = (
+                mpmath.binomial(nx, x)
+                * mpmath.power(px, x)
+                * mpmath.power(1 - px, nx - x)
+                * mpmath.binomial(ny, y)
+                * mpmath.power(py, y)
+                * mpmath.power(1 - py, ny - y)
+            )
+            probs[x] = prob
+            total_prob += prob
+
+        conditional_probs = {x: float(prob / total_prob) for x, prob in probs.items()}
+
+        return conditional_probs
